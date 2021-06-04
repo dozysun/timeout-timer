@@ -20,12 +20,12 @@ class TimeoutInterrupt(BaseException):
 class TimeoutTimer(object):
     """
     Add a timeout function to a function or statement and raise a exception if time limit runs out ,
-    it support loop nesting when timer worked as loop nesting, if use signal timer, it will fire after the inside
-    signal timer finish the work.
+    it support loop nesting, if use signal timer, outside timer will fired after the inside
+    signal timer finish the work(raise exception or normal finish).
 
-    Signal timer can only work on main thread, if not use thread timer, thread timer may cost longer time than
-    time out seconds if the timer's sub thread(user's function) is busy in a system call (time.sleep(),
-    socket.accept()...), exception will fired after system call done
+    Signal timer can only work on main thread, if not on main thread use thread timer, thread timer may cost
+    longer time than time out seconds settled if the timer's sub thread(user's function) is busy in a
+    system call (time.sleep(), socket.accept()...), exception will fired after system call done.
 
     usage:  it can work like a context or a decorator eg
              with TimeoutTimer(2) as f:   or    @TimeoutTimer(2)

@@ -1,3 +1,10 @@
+Timeout-Timer
+===============
+
+.. image:: https://img.shields.io/pypi/v/timeout-timer.svg
+    :alt: PyPI version
+    :target: https://pypi.org/project/timeout-timer/
+
 Installation
 --------------
 ::

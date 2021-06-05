@@ -1,5 +1,5 @@
 # coding: utf-8
-from timeout_timer.timeout_timer import TimeoutTimer, TimeoutInterrupt
+from timeout_timer import timeout, TimeoutInterrupt
 import time
 
 import pytest
@@ -22,7 +22,7 @@ def sleep(s):
 def test_timeout_no_seconds(timer):
     is_timeout = None
     try:
-        with TimeoutTimer(0, timer=timer) as f:
+        with timeout(0, timer=timer) as f:
             f(sleep, 1)
     except TimeoutInterrupt:
         is_timeout = True
@@ -32,7 +32,7 @@ def test_timeout_no_seconds(timer):
 def test_timeout_seconds(timer):
     is_timeout = None
     try:
-        with TimeoutTimer(1, timer=timer) as f:
+        with timeout(1, timer=timer) as f:
             f(sleep, 2)
     except TimeoutInterrupt:
         is_timeout = True
@@ -43,12 +43,12 @@ def test_timeout_nested_loop_inside_timeout(timer):
     try:
         def s():
             try:
-                with TimeoutTimer(2, timer=timer, exception=TimeoutInterruptNested) as f2:
+                with timeout(2, timer=timer, exception=TimeoutInterruptNested) as f2:
                     f2(sleep, 3)
             except TimeoutInterruptNested:
                 return True
 
-        with TimeoutTimer(10, timer=timer) as f:
+        with timeout(10, timer=timer) as f:
             is_timeout = f(s)
 
     except TimeoutInterrupt:
@@ -60,12 +60,12 @@ def test_timeout_nested_loop_outsite_timeout(timer):
     try:
         def s():
             try:
-                with TimeoutTimer(10, timer=timer, exception=TimeoutInterruptNested) as f2:
+                with timeout(10, timer=timer, exception=TimeoutInterruptNested) as f2:
                     f2(sleep, 3)
             except TimeoutInterruptNested:
                 return True
 
-        with TimeoutTimer(2, timer=timer) as f:
+        with timeout(2, timer=timer) as f:
             is_timeout = f(s)
 
     except TimeoutInterrupt:
@@ -78,14 +78,14 @@ def test_timeout_nested_loop_both_timeout(timer):
     try:
         def s():
             try:
-                with TimeoutTimer(2, timer=timer, exception=TimeoutInterruptNested) as f2:
+                with timeout(2, timer=timer, exception=TimeoutInterruptNested) as f2:
                     f2(sleep, 2)
             except TimeoutInterruptNested:
                 cnt.append(1)
             time.sleep(10)
             cnt.append(0)
 
-        with TimeoutTimer(5, timer=timer) as f:
+        with timeout(5, timer=timer) as f:
             f(s)
     except TimeoutInterrupt:
         cnt.append(1)

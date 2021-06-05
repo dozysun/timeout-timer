@@ -10,7 +10,7 @@ Timeout Timer
     it support loop nesting, if use signal timer, outside timer will fired after the inside
     signal timer finish the work(raise exception or normal finish).
 
-    Signal timer can only work on main thread, if not on main thread use thread timer, thread timer may cost
+    Support signal timer and thread timer, signal timer can only work on main thread, if not on main thread use thread timer, thread timer may cost
     longer time than time out seconds settled if the timer's sub thread(user's function) is busy in a
     system call (time.sleep(), socket.accept()...), exception will fired after system call done.
 
@@ -18,10 +18,11 @@ Usage
 ============
 support nested loop
 ::
+    from timeout_timer import timeout, TimeoutInterrupt
     try:
-        with TimeoutTimer(2, timer="signal") as f:
+        with timeout(2, timer="signal") as f:
             f(time.sleep, 0.5)
-            with TimeoutTimer(1, timer="signal") as f2:
+            with timeout(1, timer="signal") as f2:
                 f2(time.sleep, 2)
     except TimeoutInterrupt:
         print("timeout triggered")
@@ -30,14 +31,14 @@ support nested loop
 or use signal timer can simplify
 ::
     try:
-        with TimeoutTimer(2) :
+        with timeout(2) :
             time.sleep(3)
     except TimeoutInterrupt:
         print("timeout triggered")
 
 or use as decorator
 ::
-    @TimeoutTimer(2):
+    @timeout(2):
     def f():
         time.sleep(3)
         time.sleep(2)

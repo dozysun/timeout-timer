@@ -10,8 +10,8 @@ import inspect
 class TimeoutInterrupt(BaseException):
     """inherit from baseException in cased captured by board Exception（eg: except Exception） in user program"""
 
-    def __init__(self, value=""):
-        self.value = str(value)
+    def __init__(self):
+        self.value = "Timeout Interrupt"
 
     def __str__(self):
         return self.value
@@ -58,7 +58,7 @@ class TimeoutTimer(object):
 
         raise NotImplementedError
 
-    def __init__(self, seconds, timer="signal", exception=TimeoutInterrupt, message="", interval=1):
+    def __init__(self, seconds, timer="signal", exception=TimeoutInterrupt, interval=1):
         """
         :param seconds: seconds to raise a timeout exception if user func
         :param timer: the timeout timer to use signal or threading, "signal" or "thread"
@@ -68,7 +68,6 @@ class TimeoutTimer(object):
         """
         self.timeout_seconds = seconds
         self.exception_class = exception
-        self.exception_message = message
         self.timer = timer
         self.interval = interval
 
@@ -136,7 +135,7 @@ class _SignalTimeoutTimer(TimeoutTimer):
 
     def timeout_callback(self, signum, frame):
         """signal callback"""
-        raise self.exception_class(self.exception_message or str(frame))
+        raise self.exception_class()
 
 
 class _ThreadTimeoutTimer(TimeoutTimer):
@@ -150,20 +149,22 @@ class _ThreadTimeoutTimer(TimeoutTimer):
         super(_ThreadTimeoutTimer, self).__init__(*args, **kwargs)
 
     def _exec_func(self, func, *args, **kwargs):
-        _out_time = time.time() + self.timeout_seconds
         tt = _TimerThread(self.exception_class)
         tt.set_func(partial(func, *args, **kwargs))
         tt.setDaemon(True)
         tt.start()
+
+        _out_time = time.time() + self.timeout_seconds
         stop_fired = False
         # wait for task done, it stop may delayed when thread is busy in
         # a system call (time.sleep(), socket.accept(), ...)
         while not tt.func_done:
-            if (not stop_fired) and _out_time <= time.time():
+            if not stop_fired and _out_time <= time.time():
                 stop_fired = True
                 tt.stop()
             else:
-                time.sleep(self.interval)
+                remain_time = _out_time - time.time()
+                time.sleep(self.interval if remain_time > self.interval else remain_time if remain_time > 0 else 0.1)
 
         if tt.error:
             raise tt.error
@@ -309,6 +310,9 @@ class _TimerThread(StoppableThread):
     def stop(self, exception=None):
         super(_TimerThread, self).stop(exception or self.exception_class)
 
+
+timeout = TimeoutTimer
+
 if __name__ == "__main__":
     def f():
         while True:
@@ -319,7 +323,7 @@ if __name__ == "__main__":
     # cost 5s
     t = time.time()
     try:
-        with TimeoutTimer(5) as ff:
+        with timeout(5) as ff:
             ff(f)
     except TimeoutInterrupt as e:
         print(e)
@@ -329,7 +333,7 @@ if __name__ == "__main__":
     # cost 10s
     try:
         t = time.time()
-        with TimeoutTimer(5, timer="thread") as ff:
+        with timeout(5, timer="thread") as ff:
             ff(f)
     except TimeoutInterrupt as e:
         print(e)

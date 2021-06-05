@@ -1,23 +1,19 @@
 """Setuptools entry point."""
 import os
 
-try:
-    from setuptools import setup
-except ImportError:
-    from distutils.core import setup
+from setuptools import setup
 
-CLASSIFIERS = """
-Development Status :: 1 - Beta
-Intended Audience :: Developers
-License :: OSI Approved :: MIT License
-Programming Language :: C
-Programming Language :: Python :: 3
-Programming Language :: Python :: 3.6
-Programming Language :: Python :: 3.7
-Programming Language :: Python :: 3.8
-Programming Language :: Python :: 3.9
-Programming Language :: Python :: 3 :: Only
-"""
+CLASSIFIERS = [
+    'Development Status :: 4 - Beta',
+    'Intended Audience :: Developers',
+    'License :: OSI Approved :: MIT License',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.6',
+    'Programming Language :: Python :: 3.7',
+    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3 :: Only'
+]
 
 
 def long_description():
@@ -27,7 +23,7 @@ def long_description():
 
 setup(
     name='timeout-timer',
-    version='0.1.0',
+    version='0.1.1',
     description='Timeout timer use signal or thread module, support nested loop',
     long_description=long_description(),
     author='dozysun',

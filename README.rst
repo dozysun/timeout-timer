@@ -1,11 +1,11 @@
 Installation
-============
+--------------
 ::
 
     python setup.py install
 
 Timeout Timer
-============
+--------------
     Add a timeout function to a function or statement and raise a exception if time limit runs out ,
     it support loop nesting, if use signal timer, outside timer will fired after the inside
     signal timer finish the work(raise exception or normal finish).
@@ -15,9 +15,10 @@ Timeout Timer
     system call (time.sleep(), socket.accept()...), exception will fired after system call done.
 
 Usage
-============
+--------------
 support nested loop
 ::
+
     from timeout_timer import timeout, TimeoutInterrupt
     try:
         with timeout(2, timer="signal") as f:
@@ -30,6 +31,7 @@ support nested loop
 
 or use signal timer can simplify
 ::
+
     try:
         with timeout(2) :
             time.sleep(3)
@@ -38,6 +40,7 @@ or use signal timer can simplify
 
 or use as decorator
 ::
+
     @timeout(2):
     def f():
         time.sleep(3)

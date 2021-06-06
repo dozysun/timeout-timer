@@ -188,7 +188,7 @@ class StoppableThread(threading.Thread):
      and are thus restricted"""
 
     def stop(self, exception):
-        self.raiseExc(exception)
+        return self.raiseExc(exception)
 
     @property
     def thread_id(self):
@@ -255,7 +255,7 @@ class _ThreadTimeoutTimer(TimeoutTimer, StoppableThread):
         super(_ThreadTimeoutTimer, self).__init__(*args, **kwargs)
         self._timer_thread = _TimerThread(self.timeout_seconds, self, self.exception_class, self.interval)
         self._timer_thread.setDaemon(True)
-        self._current_thread = threading.current_thread()
+        self._thread_id = threading.current_thread().ident
 
     def set(self):
         self._timer_thread.start()
@@ -269,14 +269,10 @@ class _ThreadTimeoutTimer(TimeoutTimer, StoppableThread):
 
     @property
     def thread_id(self):
-        if not hasattr(self, "_thread_id"):
-            for tid, tobj in threading._active.items():
-                if tobj is self._current_thread:
-                    self._thread_id = tid
         return self._thread_id
 
     def stop(self):
-        super(_ThreadTimeoutTimer, self).stop(self.exception_class)
+        return super(_ThreadTimeoutTimer, self).stop(self.exception_class)
 
 
 class _TimerThread(threading.Thread):
@@ -284,11 +280,11 @@ class _TimerThread(threading.Thread):
     timer thread sleep wait for call parent thread's stop if the given seconds runs out
     """
 
-    def __init__(self, seconds, ptread, exception_class, interval):
+    def __init__(self, seconds, pthread, exception_class, interval):
         super(_TimerThread, self).__init__()
 
         self.timeout_seconds = seconds
-        self.parent_thread = ptread
+        self.parent_thread = pthread
         self.exception_class = exception_class
         self.interval = interval
         self.stop_event = threading.Event()

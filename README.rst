@@ -5,6 +5,10 @@ Timeout-Timer
     :alt: PyPI version
     :target: https://pypi.org/project/timeout-timer/
 
+.. image:: https://img.shields.io/pypi/pyversions/timeout-timer.svg
+    :alt: Supported Python versions
+    :target: https://pypi.org/project/timeout-timer/
+
 Installation
 --------------
 ::

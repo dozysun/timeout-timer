@@ -31,7 +31,7 @@ support nested loop
     class TimeoutInterruptNested(TimeoutInterrupt):
         pass
 
-    def test_timeout_nested_loop_both_timeout(timer):
+    def test_timeout_nested_loop_both_timeout(timer="thread"):
         cnt = 0
         try:
             with timeout(5, timer=timer):

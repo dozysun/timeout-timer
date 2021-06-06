@@ -23,7 +23,7 @@ def long_description():
 
 setup(
     name='timeout-timer',
-    version='0.1.1',
+    version='0.2.0',
     description='Timeout timer use signal or thread module, support nested loop',
     long_description=long_description(),
     author='dozysun',

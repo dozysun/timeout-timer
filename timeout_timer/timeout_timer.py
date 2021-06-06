@@ -19,24 +19,35 @@ class TimeoutInterrupt(BaseException):
 
 class TimeoutTimer(object):
     """
-    Add a timeout function to a function or statement and raise a exception if time limit runs out ,
-    it support loop nesting, if use signal timer, outside timer will fired after the inside
-    signal timer finish the work(raise exception or normal finish).
+    Add a timeout function to a function or statement and raise a exception if time limit runs out, can work as
+    a context or decorator, support loop nesting and should use diff exception class, if use signal timer,
+    outside timer will fired after the inside signal timer finish the work(raise exception or normal finish).
 
-    Signal timer can only work on main thread, if not on main thread use thread timer, thread timer may cost
-    longer time than time out seconds settled if the timer's sub thread(user's function) is busy in a
-    system call (time.sleep(), socket.accept()...), exception will fired after system call done.
+    Support signal timer and thread timer, signal timer can only work on main thread, if not on main thread use
+    thread timer, thread timer may cost longer time than time out seconds settled if the user's function is busy
+    in a system call (time.sleep(), socket.accept()...), exception will fired after system call done.
 
-    usage:  it can work like a context or a decorator eg
-             with TimeoutTimer(2) as f:   or    @TimeoutTimer(2)
-                 ...                            def f():
-                 f(do something)                    ... do something
-                 with TimeoutTimer(1):
-                    f(do something)
 
-            if use signal timer it can simplify like:
-            with TimeoutTimer(2):
-                ... do something
+    usage:
+    def test_timeout_nested_loop_both_timeout(timer):
+        cnt = 0
+        try:
+            with TimeoutTimer(5, timer=timer):
+                try:
+                    with TimeoutTimer(2, timer=timer, exception=TimeoutInterruptNested):
+                        sleep(2)
+                except TimeoutInterruptNested:
+                    cnt += 1
+                time.sleep(10)
+        except TimeoutInterrupt:
+            cnt += 1
+        assert cnt == 2
+
+    or use as decorator
+    @TimeoutTimer(2)
+    def f():
+        time.sleep(1)
+
     """
 
     def __new__(cls, *args, **kwargs):
@@ -58,7 +69,7 @@ class TimeoutTimer(object):
 
         raise NotImplementedError
 
-    def __init__(self, seconds, timer="signal", exception=TimeoutInterrupt, interval=1):
+    def __init__(self, seconds, timer="signal", exception=TimeoutInterrupt, interval=0.5):
         """
         :param seconds: seconds to raise a timeout exception if user func
         :param timer: the timeout timer to use signal or threading, "signal" or "thread"
@@ -94,8 +105,7 @@ class TimeoutTimer(object):
         return f
 
     def _exec_func(self, func, *args, **kwargs):
-        """the func wrapper to exec user func"""
-        raise NotImplementedError
+        return func(*args, **kwargs)
 
     def set(self):
         """do something before exec user func"""
@@ -113,9 +123,6 @@ class _SignalTimeoutTimer(TimeoutTimer):
         self.signal_ori_func = None
         self.signal_ori_timer = 0
         self.st = 0
-
-    def _exec_func(self, func, *args, **kwargs):
-        return func(*args, **kwargs)
 
     def set(self):
         self.st = time.time()
@@ -138,46 +145,6 @@ class _SignalTimeoutTimer(TimeoutTimer):
         raise self.exception_class()
 
 
-class _ThreadTimeoutTimer(TimeoutTimer):
-    """
-    thread.stop: If the thread is busy in a system call (time.sleep(),
-        socket.accept(), ...), the exception is simply ignored util the sleep have done
-    so the thread timer's cost time may longer than time out seconds if there is a the thread is busy in a system call
-    """
-
-    def __init__(self, *args, **kwargs):
-        super(_ThreadTimeoutTimer, self).__init__(*args, **kwargs)
-
-    def _exec_func(self, func, *args, **kwargs):
-        tt = _TimerThread(self.exception_class)
-        tt.set_func(partial(func, *args, **kwargs))
-        tt.setDaemon(True)
-        tt.start()
-
-        _out_time = time.time() + self.timeout_seconds
-        stop_fired = False
-        # wait for task done, it stop may delayed when thread is busy in
-        # a system call (time.sleep(), socket.accept(), ...)
-        while not tt.func_done:
-            if not stop_fired and _out_time <= time.time():
-                stop_fired = True
-                tt.stop()
-            else:
-                remain_time = _out_time - time.time()
-                time.sleep(self.interval if remain_time > self.interval else remain_time if remain_time > 0 else 0.1)
-
-        if tt.error:
-            raise tt.error
-        res = tt.result
-        return res
-
-    def set(self):
-        pass
-
-    def cancel(self):
-        pass
-
-
 class _DummyTimeoutTimer(TimeoutTimer):
     """
     thread.stop: If the thread is busy in a system call (time.sleep(),
@@ -187,9 +154,6 @@ class _DummyTimeoutTimer(TimeoutTimer):
 
     def __init__(self, *args, **kwargs):
         super(_DummyTimeoutTimer, self).__init__(*args, **kwargs)
-
-    def _exec_func(self, func, *args, **kwargs):
-        return func(*args, **kwargs)
 
     def set(self):
         pass
@@ -216,9 +180,12 @@ def _async_raise(tid, exctype):
 class StoppableThread(threading.Thread):
     """ thread stop Based on Philippe F's answer of
      https://stackoverflow.com/questions/323972/is-there-any-way-to-kill-a-thread
-
-     Attetion: If the thread is busy in a system call (time.sleep(),
-        socket.accept(), ...), the exception is simply ignored util the sleep have done."""
+     see: http://tomerfiliba.com/recipes/Thread2/
+     Attetion:
+     1. The exception will be raised only when executing python bytecode. If your thread calls a native/built-in
+     blocking function, the exception will be raised only when execution returns to the python code.
+     2. Only exception types can be raised safely. Exception instances are likely to cause unexpected behavior,
+     and are thus restricted"""
 
     def stop(self, exception):
         self.raiseExc(exception)
@@ -277,63 +244,92 @@ class StoppableThread(threading.Thread):
         return True
 
 
-class _TimerThread(StoppableThread):
+class _ThreadTimeoutTimer(TimeoutTimer, StoppableThread):
     """
-    thread timer's cost time may longer than
-    time out seconds if the sub thread(user's func) is busy in a system call ,  will fired after system call  done
+    thread.stop: If the thread is busy in a system call (time.sleep(),
+        socket.accept(), ...), the exception is simply ignored util the system call have done
+    so the thread timer's cost time may longer than timeout seconds.
     """
 
-    def __init__(self, timeout_class=TimeoutInterrupt):
+    def __init__(self, *args, **kwargs):
+        super(_ThreadTimeoutTimer, self).__init__(*args, **kwargs)
+        self._timer_thread = _TimerThread(self.timeout_seconds, self, self.exception_class, self.interval)
+        self._timer_thread.setDaemon(True)
+        self._current_thread = threading.current_thread()
+
+    def set(self):
+        self._timer_thread.start()
+
+    def cancel(self):
+        try:
+            if self._timer_thread.is_alive():
+                self._timer_thread.stop()
+        except self.exception_class:  # in case sub thread call a parent stop at the same time
+            pass
+
+    @property
+    def thread_id(self):
+        if not hasattr(self, "_thread_id"):
+            for tid, tobj in threading._active.items():
+                if tobj is self._current_thread:
+                    self._thread_id = tid
+        return self._thread_id
+
+    def stop(self):
+        super(_ThreadTimeoutTimer, self).stop(self.exception_class)
+
+
+class _TimerThread(threading.Thread):
+    """
+    timer thread sleep wait for call parent thread's stop if the given seconds runs out
+    """
+
+    def __init__(self, seconds, ptread, exception_class, interval):
         super(_TimerThread, self).__init__()
 
-        self.func = None
-        self.is_timeout = False
-        self.error = None
-        self.result = None
-        self.exception_class = timeout_class
-        self.func_done = False
+        self.timeout_seconds = seconds
+        self.parent_thread = ptread
+        self.exception_class = exception_class
+        self.interval = interval
+        self.stop_event = threading.Event()
 
     def run(self):
-        try:
-            self.result = self.func()
-        except self.exception_class as e:
-            self.is_timeout = True
-            self.error = e
-        except Exception as e:
-            self.error = e
-        finally:
-            self.func_done = True
+        et = time.time() + self.timeout_seconds
+        remain_seconds = self.timeout_seconds
+        # interval check in case parent func done call stop, wake up clean the timer
+        while remain_seconds > 0:
+            if self.stop_event.is_set():
+                return
+            time.sleep(remain_seconds if remain_seconds < self.interval else self.interval)
+            remain_seconds = et - time.time()
+        self.parent_thread.stop()
 
-    def set_func(self, func):
-        self.func = func
-
-    def stop(self, exception=None):
-        super(_TimerThread, self).stop(exception or self.exception_class)
+    def stop(self):
+        self.stop_event.set()
 
 
 timeout = TimeoutTimer
 
 if __name__ == "__main__":
     def f():
-        while True:
-            time.sleep(10)
-            time.sleep(50)
+        time.sleep(4)
+        time.sleep(2)
 
 
-    # cost 5s
+    # cost 2s
     t = time.time()
     try:
-        with timeout(5) as ff:
+        with timeout(2) as ff:
             ff(f)
     except TimeoutInterrupt as e:
         print(e)
     finally:
         print(time.time() - t)
 
-    # cost 10s
+    # cost 4s
     try:
         t = time.time()
-        with timeout(5, timer="thread") as ff:
+        with timeout(2, timer="thread") as ff:
             ff(f)
     except TimeoutInterrupt as e:
         print(e)

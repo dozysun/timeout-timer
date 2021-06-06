@@ -294,10 +294,10 @@ class _TimerThread(threading.Thread):
         remain_seconds = self.timeout_seconds
         # interval check in case parent func done call stop, wake up clean the timer
         while remain_seconds > 0:
-            if self.stop_event.is_set():
-                return
             time.sleep(remain_seconds if remain_seconds < self.interval else self.interval)
             remain_seconds = et - time.time()
+            if self.stop_event.is_set():
+                return
         self.parent_thread.stop()
 
     def stop(self):

@@ -17,11 +17,11 @@ Installation
 
 Timeout Timer
 --------------
-    Add a timeout function to a function or statement and raise a exception if time limit runs out, can work as
+    Add a py timeout function to a function or statement and raise a exception if time limit runs out, can work as
     a context or decorator, support loop nesting and should use diff exception class, if use signal timer,
     outside timer will fired after the inside signal timer finish the work(raise exception or normal finish).
 
-    Support signal timer and thread timer, signal timer can only work on main thread, if not on main thread use
+    Support signal timeout timer and thread timeout timer, signal timer can only work on main thread, if not on main thread use
     thread timer, thread timer may cost longer time than time out seconds settled if the user's function is busy
     in a system call (time.sleep(), socket.accept()...), exception will fired after system call done.
 

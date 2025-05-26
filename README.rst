@@ -27,7 +27,7 @@ Timeout Timer
 
 Usage
 --------------
-support nested loop
+support nested loop, use thread timeout timer in child threads to replace singal timeout timer
 ::
 
     from timeout_timer import timeout, TimeoutInterrupt
